@@ -3,7 +3,6 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 import sklearn.ensemble as ske
 from sklearn import cross_validation, tree, linear_model
-from sklearn.feature_selection import SelectFromModel
 from sklearn.naive_bayes import GaussianNB
 
 
@@ -14,51 +13,34 @@ df_genderclassmodel = pd.read_csv('data/genderclassmodel.csv')
 
 def print_nulls(df):
 	#EDA for Null Values
-	print "Number of {}: %{}".format(len(df))
+	print "Number of passengers: {}".format(len(df))
 	for feature in df.columns:	
-		print "{} Null: %{}".format(sum(df['feature'].isnull())/float(len(df)))
-	
-
-# Number of Passengers: 891
-# Pclass Null: 0
-# Sex Null: 0
-# Age Null: 177
-# SibSp Null: 0
-# Ticket Null: 0
-# Fare Null: 0
-# Cabin Null: 687
-# Embarked Null: 2
-
+		print "{} Null: {}".format(feature, round(sum(df[feature].isnull()), 2))
+	print '\n'
 
 def process_df(df):
 	
 	#Drop Features
 	df.drop(['PassengerId', 'Name', 'Ticket'], axis=1, inplace=True)
 
-	#Fill Nulls
+	#Fill missing Ages with median
 	df.loc[(df.Age.isnull()), 'Age'] = df['Age'].dropna().median()
 	
-	# All the missing Fares -> assume median of their respective class
-	if len(df.Fare[ df.Fare.isnull() ]) > 0:
-	    median_fare = np.zeros(3)
-	    for f in range(0,3):                                              # loop 0 to 2
-	        median_fare[f] = df[ df.Pclass == f+1 ]['Fare'].dropna().median()
-	    for f in range(0,3):                                              # loop 0 to 2
-	        df.loc[ (df.Fare.isnull()) & (df.Pclass == f+1 ), 'Fare'] = median_fare[f]
+	#Fill missing Fares with the median of their respective class
+	median_fare = np.zeros(3)
+	for f in range(0,3):
+		median_fare[f] = df[ df.Pclass == f+1 ]['Fare'].dropna().median()
+	for f in range(0,3):
+		df.loc[ (df.Fare.isnull()) & (df.Pclass == f+1 ), 'Fare'] = median_fare[f]
 
-	median_age = df['Age'].dropna().median()
-	if len(df.Age[ df.Age.isnull() ]) > 0:
-	    df.loc[ (df.Age.isnull()), 'Age'] = median_age
-
-
-
-	# Cabin to Letter and Number ex. A203 ->  A, 203
+	# Cabin to Letter and Number ex. A203 ->  A
 	df['Cabin_Letter'] = df.Cabin[df['Cabin'].notnull()].apply(lambda x: x[0])
-	#df['Cabin_Number'] = df.Cabin[df['Cabin'].notnull()].apply(lambda x: x[1:].split(' ')[0])
 	df.drop('Cabin', axis=1, inplace=True)
+	
+	#Sex to binary values
 	df['Sex'] = df['Sex'].map({'female' : 0, 'male' : 1})
 
-	#Dummy and drop old column
+	#Dummy and drop old columns
 	df = pd.concat([df, pd.get_dummies(df['Embarked'])], axis=1).drop('Embarked', axis=1)
 	df = pd.concat([df, pd.get_dummies(df['Pclass'])], axis=1).drop('Pclass', axis=1)
 	df = pd.concat([df, pd.get_dummies(df['Cabin_Letter'])], axis=1).drop('Cabin_Letter', axis=1)
@@ -66,16 +48,19 @@ def process_df(df):
 
 	return df
 
-
+print_nulls(df_train)
 df_train = process_df(df_train)
+
+
 
 X_train = df_train.drop(['Survived'], axis=1)
 y_train = df_train['Survived']
 X_test = process_df(df_test)
 y_test = df_genderclassmodel['Survived']
 
+#Drop non-consistent features created in dummying .
 X_train.drop(X_train.columns - X_test.columns, axis=1, inplace=True)
-print len(X_train.columns), len(X_test.columns)
+
 
 #Algorithm comparison
 algorithms = {
@@ -101,13 +86,4 @@ winner = max(results, key=results.get)
 print('\nWinner algorithm is %s with a %f %% success' % (winner, results[winner]*100))
 
 
-
-
-# log_model = LogisticRegression()
-# log_model.fit(X_train, y_train)
-# print log_model.score(X_test, y_test)
-
-# forest_model = RandomForestClassifier(n_estimators=20, oob_score=False)
-# forest_model.fit(X_train, y_train)
-# print forest_model.score(X_test, y_test)
 
